@@ -1,0 +1,59 @@
+# MTL dla wlasnego raytracera (RTIOW).
+# illum 1 = lambertian, 3 = metal (Pr = fuzz), 7 = dielectric (Ni = IOR), Ke = emisja (kolor * moc)
+
+newmtl GLASS
+# kind=dielectric ior=1.5
+Kd 1.0000 1.0000 1.0000
+Ks 1.0000 1.0000 1.0000
+Tf 1.0000 1.0000 1.0000
+Ni 1.5000
+d 0.0000
+Tr 1.0000
+Pr 0.0000
+Pm 0.0000
+Ke 0.0000 0.0000 0.0000
+illum 7
+
+newmtl LAMP_LIGHT
+# kind=diffuse_light strength=15.0
+Kd 1.0000 0.8500 0.5000
+Ks 0.0000 0.0000 0.0000
+Ke 15.0000 12.7500 7.5000
+Ni 1.0000
+d 1.0000
+Pr 1.0000
+Pm 0.0000
+illum 0
+
+newmtl METAL_DARK
+# kind=metal fuzz=0.2
+Kd 0.2000 0.2000 0.2200
+Ks 0.2000 0.2000 0.2200
+Ni 1.0000
+d 1.0000
+Pr 0.2000
+Pm 1.0000
+Ke 0.0000 0.0000 0.0000
+illum 3
+
+newmtl WALL_RED
+# kind=lambertian
+Kd 0.7000 0.0800 0.0600
+Ks 0.0000 0.0000 0.0000
+Ni 1.0000
+d 1.0000
+Pr 1.0000
+Pm 0.0000
+Ke 0.0000 0.0000 0.0000
+illum 1
+
+newmtl WALL_WHITE
+# kind=lambertian
+Kd 0.9000 0.9000 0.8800
+Ks 0.0000 0.0000 0.0000
+Ni 1.0000
+d 1.0000
+Pr 1.0000
+Pm 0.0000
+Ke 0.0000 0.0000 0.0000
+illum 1

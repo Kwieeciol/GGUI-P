@@ -1,0 +1,13 @@
+# MTL dla wlasnego raytracera (RTIOW).
+# illum 1 = lambertian, 3 = metal (Pr = fuzz), 7 = dielectric (Ni = IOR), Ke = emisja (kolor * moc)
+
+newmtl ROCK
+# kind=lambertian
+Kd 0.3500 0.3300 0.3000
+Ks 0.0000 0.0000 0.0000
+Ni 1.0000
+d 1.0000
+Pr 1.0000
+Pm 0.0000
+Ke 0.0000 0.0000 0.0000
+illum 1

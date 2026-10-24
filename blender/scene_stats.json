@@ -1,0 +1,206 @@
+{
+  "objects": [
+    {
+      "object": "Snowflake",
+      "material": "ICE",
+      "triangles": 1260,
+      "manifold": true,
+      "boundary_edges": 0,
+      "non_manifold_edges": 0,
+      "inconsistent_normals": 0,
+      "non_manifold_verts": 0,
+      "duplicate_verts": 0,
+      "signed_volume": 3.11622,
+      "degenerate_tris": 0,
+      "self_intersections": 0
+    },
+    {
+      "object": "LH_Tower_White",
+      "material": "WALL_WHITE",
+      "triangles": 512,
+      "manifold": true,
+      "boundary_edges": 0,
+      "non_manifold_edges": 0,
+      "inconsistent_normals": 0,
+      "non_manifold_verts": 0,
+      "duplicate_verts": 0,
+      "signed_volume": 0.0279,
+      "degenerate_tris": 0,
+      "self_intersections": null
+    },
+    {
+      "object": "LH_Tower_Red",
+      "material": "WALL_RED",
+      "triangles": 384,
+      "manifold": true,
+      "boundary_edges": 0,
+      "non_manifold_edges": 0,
+      "inconsistent_normals": 0,
+      "non_manifold_verts": 0,
+      "duplicate_verts": 0,
+      "signed_volume": 0.02453,
+      "degenerate_tris": 0,
+      "self_intersections": null
+    },
+    {
+      "object": "LH_Metal",
+      "material": "METAL_DARK",
+      "triangles": 1520,
+      "manifold": true,
+      "boundary_edges": 0,
+      "non_manifold_edges": 0,
+      "inconsistent_normals": 0,
+      "non_manifold_verts": 0,
+      "duplicate_verts": 0,
+      "signed_volume": 0.00867,
+      "degenerate_tris": 0,
+      "self_intersections": null
+    },
+    {
+      "object": "LH_Glass",
+      "material": "GLASS",
+      "triangles": 192,
+      "manifold": true,
+      "boundary_edges": 0,
+      "non_manifold_edges": 0,
+      "inconsistent_normals": 0,
+      "non_manifold_verts": 0,
+      "duplicate_verts": 0,
+      "signed_volume": 0.00044,
+      "degenerate_tris": 0,
+      "self_intersections": 0
+    },
+    {
+      "object": "LH_Lamp",
+      "material": "LAMP_LIGHT",
+      "triangles": 224,
+      "manifold": true,
+      "boundary_edges": 0,
+      "non_manifold_edges": 0,
+      "inconsistent_normals": 0,
+      "non_manifold_verts": 0,
+      "duplicate_verts": 0,
+      "signed_volume": 0.00025,
+      "degenerate_tris": 0,
+      "self_intersections": 0
+    },
+    {
+      "object": "Rock",
+      "material": "ROCK",
+      "triangles": 240,
+      "manifold": true,
+      "boundary_edges": 0,
+      "non_manifold_edges": 0,
+      "inconsistent_normals": 0,
+      "non_manifold_verts": 0,
+      "duplicate_verts": 0,
+      "signed_volume": 0.04791,
+      "degenerate_tris": 0,
+      "self_intersections": null
+    },
+    {
+      "object": "Snow",
+      "material": "SNOW",
+      "triangles": 420,
+      "manifold": true,
+      "boundary_edges": 0,
+      "non_manifold_edges": 0,
+      "inconsistent_normals": 0,
+      "non_manifold_verts": 0,
+      "duplicate_verts": 0,
+      "signed_volume": 0.00712,
+      "degenerate_tris": 0,
+      "self_intersections": null
+    }
+  ],
+  "total_triangles": 4752,
+  "lighthouse_triangles": 2832,
+  "limits": {
+    "total": 15000,
+    "snowflake": 6000,
+    "lighthouse": 4000,
+    "rock": 1500,
+    "snow_piece": 200
+  },
+  "within_limits": {
+    "total": true,
+    "snowflake": true,
+    "lighthouse": true,
+    "rock": true,
+    "snow_piece": true
+  },
+  "snow_pieces": 15,
+  "snow_piece_triangles": {
+    "ball": 80,
+    "star": 44
+  },
+  "gaps": {
+    "lighthouse_rock_to_cavity_min": 0.03,
+    "lighthouse_rock_to_ice_surface_min": 0.03,
+    "cavity_to_core_outer_min": 0.0644,
+    "snow_to_ice_min": 0.2503,
+    "required": 0.02
+  },
+  "overlaps": {
+    "glass_vs_lamp": 0,
+    "glass_vs_metal": 0,
+    "ice_vs_lighthouse": 0
+  },
+  "cavity_volume": 0.8265,
+  "snowflake_bbox": [
+    [
+      -1.723,
+      -0.55,
+      -1.99
+    ],
+    [
+      1.723,
+      0.55,
+      1.99
+    ]
+  ],
+  "lighthouse_height": 1.2,
+  "lighthouse_rock_z": [
+    -0.78,
+    0.62
+  ],
+  "camera": {
+    "blender": {
+      "position": [
+        0.0,
+        -8.5,
+        2.0
+      ],
+      "look_at": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "up": [
+        0,
+        0,
+        1
+      ]
+    },
+    "obj_y_up": {
+      "position": [
+        0.0,
+        2.0,
+        8.5
+      ],
+      "look_at": [
+        0.0,
+        0.0,
+        -0.0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ]
+    },
+    "vfov_deg": 30.0,
+    "aspect": "1920:1080"
+  },
+  "out_dir": "C:\\Users\\kwiecinski\\Desktop\\GGUI-Projekt\\blender"
+}
