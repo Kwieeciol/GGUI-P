@@ -77,5 +77,5 @@ int main() {
     auto minutes = duration.count() / 60;
     auto seconds = duration.count() % 60;
 
-    std::cout << "Czas renderowania: " << minutes << " min " << seconds << " sek\n";
+    std::clog << "Czas renderowania: " << minutes << " min " << seconds << " sek\n";
 }
