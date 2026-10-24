@@ -1,4 +1,5 @@
 #include "rtweekend.h"
+#include <chrono>
 
 #include "hittable.h"
 #include "hittable_list.h"
@@ -65,5 +66,13 @@ int main() {
     cam.defocus_angle = 0.6;
     cam.focus_dist    = 10.0;
 
+    auto t_start = std::chrono::high_resolution_clock::now();
     cam.render(world);
+    auto t_end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start);
+
+    auto minutes = duration.count() / 60;
+    auto seconds = duration.count() % 60;
+
+    std::cout << "Czas renderowania: " << minutes << " min " << seconds << " sek\n";
 }
