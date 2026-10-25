@@ -8,11 +8,11 @@
 #include "camera.h"
 #include "material.h"
 
-int main() {
+void bounding_spheres() {
     hittable_list world;
 
-    auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
-    world.add(make_shared<sphere>(point3(0,-1000,0), 1000, ground_material));
+    auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
+    world.add(make_shared<sphere>(point3(0,-1000,0), 1000, make_shared<lambertian>(checker)));
 
     for (int a = -11; a < 11; a++) {
         for (int b = -11; b < 11; b++) {
@@ -69,13 +69,69 @@ int main() {
     cam.defocus_angle = 0.6;
     cam.focus_dist    = 10.0;
 
-    auto t_start = std::chrono::high_resolution_clock::now();
     cam.render(world);
+}
+
+void checkered_spheres() {
+    hittable_list world;
+
+    auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
+
+    world.add(make_shared<sphere>(point3(0, -10, 0), 10, make_shared<lambertian>(checker)));
+    world.add(make_shared<sphere>(point3(0, 10, 0), 10, make_shared<lambertian>(checker)));
+
+    camera cam;
+
+    cam.aspect_ratio = 16.0 / 9.0;
+    cam.image_width = 400;
+    cam.samples_per_pixel = 100;
+    cam.max_depth = 50;
+
+    cam.vfov = 20;
+    cam.lookfrom = point3(13, 2, 3);
+    cam.lookat = point3(0, 0, 0);
+    cam.vup = vec3(0, 1, 0);
+
+    cam.defocus_angle = 0;
+
+    cam.render(world);
+}
+
+void earth() {
+    auto earth_texture = make_shared<image_texture>("earthmap.jpg");
+    auto earth_surface = make_shared<lambertian>(earth_texture);
+    auto globe = make_shared<sphere>(point3(0,0,0), 2, earth_surface);
+
+    camera cam;
+
+    cam.aspect_ratio = 16.0 / 9.0;
+    cam.image_width = 400;
+    cam.samples_per_pixel = 100;
+    cam.max_depth = 50;
+
+    cam.vfov = 20;
+    cam.lookfrom = point3(0,0,12);
+    cam.lookat = point3(0,0,0);
+    cam.vup = vec3(0,1,0);
+
+    cam.defocus_angle = 0;
+
+    cam.render(hittable_list(globe));
+}
+
+int main() {
+    auto t_start = std::chrono::high_resolution_clock::now();
+
+    switch(3) {
+        case 1: bounding_spheres(); break;
+        case 2: checkered_spheres(); break;
+        case 3: earth(); break;
+    }
+
     auto t_end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start);
 
     auto minutes = duration.count() / 60;
     auto seconds = duration.count() % 60;
-
     std::clog << "Czas renderowania: " << minutes << " min " << seconds << " sek\n";
 }
