@@ -93,6 +93,7 @@ private:
     sf::Texture texture;
     sf::Sprite sprite;
     sf::Clock delta_clock;
+    sf::Clock present_clock;
 
     ExportOptions options;
     bool has_ffmpeg = fs::exists(ffmpeg_path());
@@ -370,6 +371,9 @@ public:
             image.setPixel({x, static_cast<unsigned>(y)},
                            sf::Color(to_byte(c.x()), to_byte(c.y()), to_byte(c.z())));
         }
+
+        if (present_clock.getElapsedTime() < sf::milliseconds(16)) return;
+        present_clock.restart();
 
         texture.update(image);
         handle_events();

@@ -52,7 +52,7 @@ class camera {
             std::sort(tiles.begin(), tiles.end(), [&](const rect& a, const rect& b) { return dist2(a) < dist2(b); });
 
             const int n_tiles = static_cast<int>(tiles.size());
-            const unsigned n_threads = thread_count > 0 ? static_cast<unsigned>(thread_count) : std::max(1u, std::thread::hardware_concurrency());
+            const unsigned n_threads = thread_count > 0 ? static_cast<unsigned>(thread_count) : std::max(1u, std::thread::hardware_concurrency() - 1);
             std::clog << "Threads: " << n_threads << ", tiles: " << n_tiles << " (" << tile_size << "x" << tile_size << ")\n";
 
             std::vector<color> frame(static_cast<size_t>(image_width) * image_height);
