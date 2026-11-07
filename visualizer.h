@@ -197,6 +197,10 @@ private:
             if (event->is<sf::Event::Closed>())
                 window.close();
 
+            if (const auto* resized = event->getIf<sf::Event::Resized>()) {
+                apply_letterbox(resized->size);
+            }
+
             if (const auto* key = event->getIf<sf::Event::KeyPressed>()) {
                 const bool cmd = key->control || key->system;
                 if (cmd && key->code == sf::Keyboard::Key::E &&
@@ -313,6 +317,30 @@ private:
         window.display();
     }
 
+    void apply_letterbox(sf::Vector2u window_size) {
+        const float win_w = float(window_size.x);
+        const float win_h = float(window_size.y);
+        const float menu  = float(menu_height);
+
+        const float area_h = std::max(1.f, win_h - menu);
+
+        const float image_ratio = float(width) / float(height);
+        const float area_ratio  = win_w / area_h;
+
+        float draw_w = win_w, draw_h = area_h;
+        if (area_ratio > image_ratio) {
+            draw_w = area_h * image_ratio;
+        } else {
+            draw_h = win_w / image_ratio;
+        }
+        const float x = (win_w - draw_w) / 2.f;
+        const float y = menu + (area_h - draw_h) / 2.f;
+
+        sf::View view(sf::FloatRect({0.f, menu}, {float(width), float(height)}));
+        view.setViewport(sf::FloatRect({x / win_w, y / win_h}, {draw_w / win_w, draw_h / win_h}));
+        window.setView(view);
+    }
+
 public:
     Visualizer(unsigned image_width, double aspect_ratio)
         : width(image_width),
@@ -326,6 +354,7 @@ public:
             throw std::runtime_error("ImGui-SFML init failed");
 
         sprite.setPosition({0.f, static_cast<float>(menu_height)});
+        apply_letterbox(window.getSize());
     }
 
     ~Visualizer() { ImGui::SFML::Shutdown(); }
