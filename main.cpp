@@ -8,6 +8,7 @@
 #include "camera.h"
 #include "material.h"
 #include "quad.h"
+#include "visualizer.h"
 
 void bounding_spheres() {
     hittable_list world;
@@ -56,6 +57,7 @@ void bounding_spheres() {
     world = hittable_list(make_shared<bvh_node>(world));
 
     camera cam;
+    Visualizer visualizer(400, 16.0 / 9.0);
 
     cam.aspect_ratio = 16.0 / 9.0;
     cam.image_width = 400;
@@ -71,7 +73,10 @@ void bounding_spheres() {
     cam.defocus_angle = 0.6;
     cam.focus_dist = 10.0;
 
-    cam.render(world);
+    cam.render(world, [&](int y, const std::vector<color>& row) {
+        visualizer.on_scanline(y, row);
+    });
+    visualizer.display();
 }
 
 void checkered_spheres() {
@@ -83,6 +88,7 @@ void checkered_spheres() {
     world.add(make_shared<sphere>(point3(0, 10, 0), 10, make_shared<lambertian>(checker)));
 
     camera cam;
+    Visualizer visualizer(400, 16.0 / 9.0);
 
     cam.aspect_ratio = 16.0 / 9.0;
     cam.image_width = 400;
@@ -97,7 +103,10 @@ void checkered_spheres() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world);
+    cam.render(world, [&](int y, const std::vector<color>& row) {
+        visualizer.on_scanline(y, row);
+    });
+    visualizer.display();
 }
 
 void earth() {
@@ -106,6 +115,7 @@ void earth() {
     auto globe = make_shared<sphere>(point3(0,0,0), 2, earth_surface);
 
     camera cam;
+    Visualizer visualizer(400, 16.0 / 9.0);
 
     cam.aspect_ratio = 16.0 / 9.0;
     cam.image_width = 400;
@@ -120,7 +130,10 @@ void earth() {
 
     cam.defocus_angle = 0;
 
-    cam.render(hittable_list(globe));
+    cam.render(hittable_list(globe), [&](int y, const std::vector<color>& row) {
+        visualizer.on_scanline(y, row);
+    });
+    visualizer.display();
 }
 
 void perlin_spheres() {
@@ -131,6 +144,7 @@ void perlin_spheres() {
     world.add(make_shared<sphere>(point3(0,2,0), 2, make_shared<lambertian>(pertext)));
 
     camera cam;
+    Visualizer visualizer(400, 16.0 / 9.0);
 
     cam.aspect_ratio = 16.0 / 9.0;
     cam.image_width = 400;
@@ -145,7 +159,10 @@ void perlin_spheres() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world);
+    cam.render(world, [&](int y, const std::vector<color>& row) {
+        visualizer.on_scanline(y, row);
+    });
+    visualizer.display();
 }
 
 void quads() {
@@ -164,6 +181,7 @@ void quads() {
     world.add(make_shared<quad>(point3(-2,-3, 5), vec3(4, 0, 0), vec3(0, 0,-4), lower_teal));
 
     camera cam;
+    Visualizer visualizer(400, 16.0 / 9.0);
 
     cam.aspect_ratio = 1.0;
     cam.image_width = 400;
@@ -178,7 +196,10 @@ void quads() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world);
+    cam.render(world, [&](int y, const std::vector<color>& row) {
+        visualizer.on_scanline(y, row);
+    });
+    visualizer.display();
 }
 
 void cornell_box() {
@@ -197,6 +218,7 @@ void cornell_box() {
     world.add(make_shared<quad>(point3(0,0,555), vec3(555,0,0), vec3(0,555,0), white));
 
     camera cam;
+    Visualizer visualizer(600, 1.0);
 
     cam.aspect_ratio = 1.0;
     cam.image_width = 600;
@@ -211,7 +233,10 @@ void cornell_box() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world);
+    cam.render(world, [&](int y, const std::vector<color>& row) {
+        visualizer.on_scanline(y, row);
+    });
+    visualizer.display();
 }
 
 void simple_light() {
@@ -226,6 +251,7 @@ void simple_light() {
     world.add(make_shared<quad>(point3(3,1,-2), vec3(2,0,0), vec3(0,2,0), difflight));
 
     camera cam;
+    Visualizer visualizer(400, 16.0 / 9.0);
 
     cam.aspect_ratio = 16.0 / 9.0;
     cam.image_width = 400;
@@ -240,13 +266,16 @@ void simple_light() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world);
+    cam.render(world, [&](int y, const std::vector<color>& row) {
+        visualizer.on_scanline(y, row);
+    });
+    visualizer.display();
 }
 
 int main() {
     auto t_start = std::chrono::high_resolution_clock::now();
 
-    switch(7) {
+    switch(6) {
         case 1: bounding_spheres(); break;
         case 2: checkered_spheres(); break;
         case 3: earth(); break;

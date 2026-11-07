@@ -5,6 +5,7 @@
     # pragma warning (push, 0)
 #endif
 
+#define STB_IMAGE_STATIC
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_FAILURE_USERMSG
 #include "external/stb_image.h"

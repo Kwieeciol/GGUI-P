@@ -3,6 +3,10 @@
 
 #include "hittable.h"
 #include "material.h"
+#include <functional>
+#include <vector>
+
+using ScanlineCallback = std::function<void(int, const std::vector<color>&)>;
 
 class camera {
     public:
@@ -20,12 +24,13 @@ class camera {
         double defocus_angle = 0; // variation angle of rays through each pixel
         double focus_dist = 10; // distance from camera lookfrom point of plane of perfect focus
 
-        void render(const hittable& world) {
+        void render(const hittable& world, ScanlineCallback on_scanline) {
             initialize();
 
             std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
             for (int j = 0; j < image_height; j++) {
+                std::vector<color> row;
                 std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
                 for (int i = 0; i < image_width; i++) {
                     color pixel_color(0,0,0);
@@ -33,8 +38,10 @@ class camera {
                         ray r = get_ray(i, j);
                         pixel_color += ray_color(r, max_depth, world);
                     }
-                    write_color(std::cout, pixel_samples_scale * pixel_color);
+                    // write_color(std::cout, pixel_samples_scale * pixel_color);
+                    row.push_back(pixel_samples_scale * pixel_color);                    
                 }
+                on_scanline(j, row);
             }
 
             std::clog << "\rDone.                 \n";
