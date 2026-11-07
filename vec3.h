@@ -56,9 +56,7 @@ class vec3 {
         }
 };
 
-// point3 is just an alias for vec3 but useful for geometric clarity in the code
 using point3 = vec3;
-
 
 // vector utility functions
 inline std::ostream& operator<<(std::ostream& out, const vec3& v) {

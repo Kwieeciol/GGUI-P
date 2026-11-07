@@ -69,9 +69,11 @@ class camera {
                     for (int j = 0; j < t.h; j++) {
                         for (int i = 0; i < t.w; i++) {
                             color pixel_color(0, 0, 0);
-                            for (int sample = 0; sample < samples_per_pixel; sample++) {
-                                ray r = get_ray(t.x0 + i, t.y0 + j);
-                                pixel_color += ray_color(r, max_depth, world);
+                            for (int s_j = 0; s_j < sqrt_spp; s_j++) {
+                                for (int s_i = 0; s_i < sqrt_spp; s_i++) {
+                                    ray r = get_ray(i, j, s_i, s_j);
+                                    pixel_color += ray_color(r, max_depth, world);
+                                }
                             }
                             frame[static_cast<size_t>(t.y0 + j) * image_width + t.x0 + i] = pixel_samples_scale * pixel_color;
                         }
@@ -145,6 +147,8 @@ class camera {
     private:
         int image_height;
         double pixel_samples_scale;
+        int sqrt_spp;
+        double recip_sqrt_spp;
         point3 center;
         point3 pixel00_loc;
         vec3 pixel_delta_u;
@@ -157,7 +161,9 @@ class camera {
             image_height = int(image_width / aspect_ratio);
             image_height = (image_height < 1) ? 1 : image_height;
 
-            pixel_samples_scale = 1.0 / samples_per_pixel;
+            sqrt_spp = int(std::sqrt(samples_per_pixel));
+            pixel_samples_scale = 1.0 / (sqrt_spp * sqrt_spp);
+            recip_sqrt_spp = 1.0 / sqrt_spp;
 
             center = lookfrom;
 
@@ -184,8 +190,8 @@ class camera {
             defocus_disk_v = v * defocus_radius;
         }
 
-        ray get_ray(int i, int j) const {
-            auto offset = sample_square();
+        ray get_ray(int i, int j, int s_i, int s_j) const {
+            auto offset = sample_square_stratified(s_i, s_j);
             auto pixel_sample = pixel00_loc
                                 + ((i + offset.x()) * pixel_delta_u)
                                 + ((j + offset.y()) * pixel_delta_v);
@@ -195,6 +201,13 @@ class camera {
             auto ray_time = random_double();
 
             return ray(ray_origin, ray_direction, ray_time);
+        }
+
+        vec3 sample_square_stratified(int s_i, int s_j) const {
+            auto px = ((s_i + random_double()) * recip_sqrt_spp) - 0.5;
+            auto py = ((s_j + random_double()) * recip_sqrt_spp) - 0.5;
+
+            return vec3(px, py, 0);
         }
 
         vec3 sample_square() const {
