@@ -1,5 +1,6 @@
 #include "rtweekend.h"
 #include <chrono>
+#include <cstdlib>
 
 #include "bvh.h"
 #include "hittable.h"
@@ -414,10 +415,15 @@ void final_scene(int image_width, int samples_per_pixel, int max_depth) {
     visualizer.display();
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    int scene = 0;
+    if (argc > 1) {
+        scene = std::atoi(argv[1]);
+    }
+
     auto t_start = std::chrono::high_resolution_clock::now();
 
-    switch(4) {
+    switch(scene) {
         case 1: bounding_spheres(); break;
         case 2: checkered_spheres(); break;
         case 3: earth(); break;
