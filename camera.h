@@ -5,20 +5,12 @@
 #include "material.h"
 #include <algorithm>
 #include <atomic>
-#include <condition_variable>
+#include <chrono>
 #include <functional>
-#include <mutex>
 #include <thread>
 #include <vector>
 
-struct tile {
-    int x0, y0;
-    int width, height;
-    std::vector<color> pixels;
-};
-
 using ScanlineCallback = std::function<void(int, const std::vector<color>&)>;
-using TileCallback = std::function<void(const tile&)>;
 
 class camera {
     public:
@@ -26,9 +18,9 @@ class camera {
         int image_width = 100;
         int samples_per_pixel = 10;
         int max_depth = 10;
-        color  background;
+        color background;
 
-        double vfov = 90; 
+        double vfov = 90;
         point3 lookfrom = point3(0, 0, 0);
         point3 lookat = point3(0, 0, -1);
         vec3 vup = vec3(0, 1, 0);
@@ -37,105 +29,123 @@ class camera {
         double focus_dist = 10;
 
         int tile_size = 32;
-        int thread_count = 0; // 0 -wszystkie watki cpu
+        int thread_count = 0;
+        color tile_outline = color(0.35, 0.35, 0.35);
 
-        void render_tiles(const hittable& world, TileCallback on_tile) {
+        void render(const hittable& world, ScanlineCallback on_scanline) {
+            using namespace std::chrono_literals;
             initialize();
 
-            std::vector<tile> tiles;
-            for (int y = 0; y < image_height; y += tile_size) {
-                for (int x = 0; x < image_width; x += tile_size) {
-                    tiles.push_back({
-                        x, y, std::min(tile_size, image_width - x), std::min(tile_size, image_height - y), {}
-                    });
-                }
-            }
+            struct rect { int x0, y0, w, h; };
+            std::vector<rect> tiles;
+            for (int y = 0; y < image_height; y += tile_size)
+                for (int x = 0; x < image_width; x += tile_size)
+                    tiles.push_back(
+                        {x, y, std::min(tile_size, image_width - x), std::min(tile_size, image_height - y)}
+                    );
 
             const double cx = image_width / 2.0, cy = image_height / 2.0;
-            auto dist2 = [&](const tile& t) {
-                double dx = t.x0 + t.width / 2.0 - cx;
-                double dy = t.y0 + t.height / 2.0 - cy;
+            auto dist2 = [&](const rect& t) {
+                double dx = t.x0 + t.w / 2.0 - cx, dy = t.y0 + t.h / 2.0 - cy;
                 return dx * dx + dy * dy;
             };
-            std::sort(tiles.begin(), tiles.end(), [&](const tile& a, const tile& b) {
-                return dist2(a) < dist2(b);
-            });
+            std::sort(tiles.begin(), tiles.end(), [&](const rect& a, const rect& b) { return dist2(a) < dist2(b); });
 
             const int n_tiles = static_cast<int>(tiles.size());
             const unsigned n_threads = thread_count > 0 ? static_cast<unsigned>(thread_count) : std::max(1u, std::thread::hardware_concurrency());
-
             std::clog << "Threads: " << n_threads << ", tiles: " << n_tiles << " (" << tile_size << "x" << tile_size << ")\n";
 
+            std::vector<color> frame(static_cast<size_t>(image_width) * image_height);
+            std::vector<std::atomic<int>> rows_done(n_tiles);
+            std::vector<std::atomic<bool>> started(n_tiles);
             std::atomic<int> next_tile{0};
-            std::mutex m;
-            std::condition_variable cv;
-            std::vector<int> finished;
+            std::atomic<int> tiles_finished{0};
 
             auto worker = [&] {
                 for (int k; (k = next_tile++) < n_tiles; ) {
-                    tile& t = tiles[k];
-                    t.pixels.resize(static_cast<size_t>(t.width) * t.height);
+                    const rect& t = tiles[k];
+                    started[k].store(true, std::memory_order_release);
 
-                    for (int j = 0; j < t.height; j++) {
-                        for (int i = 0; i < t.width; i++) {
+                    for (int j = 0; j < t.h; j++) {
+                        for (int i = 0; i < t.w; i++) {
                             color pixel_color(0, 0, 0);
                             for (int sample = 0; sample < samples_per_pixel; sample++) {
                                 ray r = get_ray(t.x0 + i, t.y0 + j);
                                 pixel_color += ray_color(r, max_depth, world);
                             }
-                            t.pixels[j * t.width + i] = pixel_samples_scale * pixel_color;
+                            frame[static_cast<size_t>(t.y0 + j) * image_width + t.x0 + i] = pixel_samples_scale * pixel_color;
                         }
+                        rows_done[k].store(j + 1, std::memory_order_release);
                     }
-
-                    { std::lock_guard lock(m); finished.push_back(k); }
-                    cv.notify_one();
+                    tiles_finished.fetch_add(1, std::memory_order_release);
                 }
             };
 
             std::vector<std::thread> threads;
-            for (unsigned n = 0; n < n_threads; n++) {
+            for (unsigned n = 0; n < n_threads; n++)
                 threads.emplace_back(worker);
+
+            std::vector<std::vector<color>> shown(image_height, std::vector<color>(image_width, color(0, 0, 0)));
+            std::vector<int>  rows_shown(n_tiles, 0);
+            std::vector<char> outlined(n_tiles, 0);
+            std::vector<char> dirty(image_height, 0);
+            auto last_update = std::chrono::steady_clock::now();
+
+            while (true) {
+                const int finished = tiles_finished.load(std::memory_order_acquire);
+
+                for (int k = 0; k < n_tiles; k++) {
+                    const rect& t = tiles[k];
+                    if (!outlined[k] && started[k].load(std::memory_order_acquire)) {
+                        outlined[k] = 1;
+                        for (int j = rows_shown[k]; j < t.h; j++) {
+                            auto& row = shown[t.y0 + j];
+                            if (j == 0 || j == t.h - 1)
+                                std::fill_n(row.begin() + t.x0, t.w, tile_outline);
+                            row[t.x0] = row[t.x0 + t.w - 1] = tile_outline;
+                            dirty[t.y0 + j] = 1;
+                        }
+                    }
+
+                    const int done = rows_done[k].load(std::memory_order_acquire);
+                    for (int j = rows_shown[k]; j < done; j++) {
+                        const auto* src = &frame[static_cast<size_t>(t.y0 + j) * image_width + t.x0];
+                        std::copy_n(src, t.w, shown[t.y0 + j].begin() + t.x0);
+                        dirty[t.y0 + j] = 1;
+                    }
+                    rows_shown[k] = done;
+                }
+
+                bool sent = false;
+                for (int y = 0; y < image_height; y++) {
+                    if (!dirty[y]) continue;
+                    on_scanline(y, shown[y]);
+                    dirty[y] = 0;
+                    sent = true;
+                }
+
+                const auto now = std::chrono::steady_clock::now();
+                if (sent) {
+                    last_update = now;
+                } else if (now - last_update > 100ms) {
+                    on_scanline(0, shown[0]);
+                    last_update = now;
+                }
+
+                std::clog << "\rTiles: " << finished << " / " << n_tiles << "   " << std::flush;
+
+                if (finished == n_tiles) break;
+                std::this_thread::sleep_for(30ms);
             }
 
-            for (int done = 0; done < n_tiles; ) {
-                std::vector<int> batch;
-                {
-                    std::unique_lock lock(m);
-                    cv.wait(lock, [&] { return !finished.empty(); });
-                    batch.swap(finished);
-                }
-                for (int k : batch) {
-                    on_tile(tiles[k]);
-                    tiles[k].pixels = {};
-                    done++;
-                }
-                std::clog << "\rTiles: " << done << " / " << n_tiles << " " << std::flush;
-            }
-
-            for (auto& t : threads) t.join();
-            std::clog << "\rDone.\n";
+            for (auto& th : threads) th.join();
+            std::clog << "\rDone. \n";
         }
 
-        void render(const hittable& world, ScanlineCallback on_scanline) {
-            std::vector<std::vector<color>> image;
- 
-            render_tiles(world, [&](const tile& t) {
-                if (image.empty())
-                    image.assign(image_height, std::vector<color>(image_width, color(0, 0, 0)));
- 
-                for (int j = 0; j < t.height; j++)
-                    std::copy_n(t.pixels.begin() + j * t.width, t.width,
-                                image[t.y0 + j].begin() + t.x0);
- 
-                for (int j = 0; j < t.height; j++)
-                    on_scanline(t.y0 + j, image[t.y0 + j]);
-            });
-        }
-            
     private:
         int image_height;
         double pixel_samples_scale;
-        point3 center; 
+        point3 center;
         point3 pixel00_loc;
         vec3 pixel_delta_u;
         vec3 pixel_delta_v;
