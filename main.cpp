@@ -58,6 +58,8 @@ void bounding_spheres() {
 
     world = hittable_list(make_shared<bvh_node>(world));
 
+    hittable_list lights; // no light sources in this scene
+
     camera cam;
     Visualizer visualizer(400, 16.0 / 9.0);
 
@@ -75,7 +77,7 @@ void bounding_spheres() {
     cam.defocus_angle = 0.6;
     cam.focus_dist = 10.0;
 
-    cam.render(world, [&](int y, const std::vector<color>& row) {
+    cam.render(world, lights, [&](int y, const std::vector<color>& row) {
         visualizer.on_scanline(y, row);
     });
     visualizer.display();
@@ -88,6 +90,8 @@ void checkered_spheres() {
 
     world.add(make_shared<sphere>(point3(0, -10, 0), 10, make_shared<lambertian>(checker)));
     world.add(make_shared<sphere>(point3(0, 10, 0), 10, make_shared<lambertian>(checker)));
+
+    hittable_list lights; // no light sources in this scene
 
     camera cam;
     Visualizer visualizer(400, 16.0 / 9.0);
@@ -105,7 +109,7 @@ void checkered_spheres() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world, [&](int y, const std::vector<color>& row) {
+    cam.render(world, lights, [&](int y, const std::vector<color>& row) {
         visualizer.on_scanline(y, row);
     });
     visualizer.display();
@@ -115,6 +119,8 @@ void earth() {
     auto earth_texture = make_shared<image_texture>("earthmap.jpg");
     auto earth_surface = make_shared<lambertian>(earth_texture);
     auto globe = make_shared<sphere>(point3(0,0,0), 2, earth_surface);
+
+    hittable_list lights; // no light sources in this scene
 
     camera cam;
     Visualizer visualizer(400, 16.0 / 9.0);
@@ -132,7 +138,7 @@ void earth() {
 
     cam.defocus_angle = 0;
 
-    cam.render(hittable_list(globe), [&](int y, const std::vector<color>& row) {
+    cam.render(hittable_list(globe), lights, [&](int y, const std::vector<color>& row) {
         visualizer.on_scanline(y, row);
     });
     visualizer.display();
@@ -144,6 +150,8 @@ void perlin_spheres() {
     auto pertext = make_shared<noise_texture>(4);
     world.add(make_shared<sphere>(point3(0,-1000,0), 1000, make_shared<lambertian>(pertext)));
     world.add(make_shared<sphere>(point3(0,2,0), 2, make_shared<lambertian>(pertext)));
+
+    hittable_list lights; // no light sources in this scene
 
     camera cam;
     Visualizer visualizer(400, 16.0 / 9.0);
@@ -161,7 +169,7 @@ void perlin_spheres() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world, [&](int y, const std::vector<color>& row) {
+    cam.render(world, lights, [&](int y, const std::vector<color>& row) {
         visualizer.on_scanline(y, row);
     });
     visualizer.display();
@@ -182,6 +190,8 @@ void quads() {
     world.add(make_shared<quad>(point3(-2, 3, 1), vec3(4, 0, 0), vec3(0, 0, 4), upper_orange));
     world.add(make_shared<quad>(point3(-2,-3, 5), vec3(4, 0, 0), vec3(0, 0,-4), lower_teal));
 
+    hittable_list lights; // no light sources in this scene
+
     camera cam;
     Visualizer visualizer(400, 1.0);
 
@@ -198,7 +208,7 @@ void quads() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world, [&](int y, const std::vector<color>& row) {
+    cam.render(world, lights, [&](int y, const std::vector<color>& row) {
         visualizer.on_scanline(y, row);
     });
     visualizer.display();
@@ -219,22 +229,26 @@ void cornell_box() {
     world.add(make_shared<quad>(point3(555,555,555), vec3(-555,0,0), vec3(0,0,-555), white));
     world.add(make_shared<quad>(point3(0,0,555), vec3(555,0,0), vec3(0,555,0), white));
 
+    auto empty_material = shared_ptr<material>();
+    hittable_list lights;
+    lights.add(
+        make_shared<quad>(point3(343,554,332), vec3(-130,0,0), vec3(0,0,-105), empty_material));
+    lights.add(make_shared<sphere>(point3(190, 90, 190), 90, empty_material));
+
     shared_ptr<hittable> box1 = box(point3(0,0,0), point3(165,330,165), white);
     box1 = make_shared<rotate_y>(box1, 15);
     box1 = make_shared<translate>(box1, vec3(265,0,295));
     world.add(box1);
 
-    shared_ptr<hittable> box2 = box(point3(0,0,0), point3(165,165,165), white);
-    box2 = make_shared<rotate_y>(box2, -18);
-    box2 = make_shared<translate>(box2, vec3(130,0,65));
-    world.add(box2);
+    auto glass = make_shared<dielectric>(1.5);
+    world.add(make_shared<sphere>(point3(190,90,190), 90, glass));
 
     camera cam;
     Visualizer visualizer(600, 1.0);
 
     cam.aspect_ratio = 1.0;
     cam.image_width = 600;
-    cam.samples_per_pixel = 200;
+    cam.samples_per_pixel = 100;
     cam.max_depth = 50;
     cam.background = color(0,0,0);
 
@@ -245,7 +259,7 @@ void cornell_box() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world, [&](int y, const std::vector<color>& row) {
+    cam.render(world, lights, [&](int y, const std::vector<color>& row) {
         visualizer.on_scanline(y, row);
     });
     visualizer.display();
@@ -261,6 +275,9 @@ void simple_light() {
     auto difflight = make_shared<diffuse_light>(color(4,4,4));
     world.add(make_shared<sphere>(point3(0,7,0), 2, difflight));
     world.add(make_shared<quad>(point3(3,1,-2), vec3(2,0,0), vec3(0,2,0), difflight));
+
+    auto empty_material = shared_ptr<material>();
+    quad lights(point3(3,1,-2), vec3(2,0,0), vec3(0,2,0), empty_material);
 
     camera cam;
     Visualizer visualizer(400, 16.0 / 9.0);
@@ -278,7 +295,7 @@ void simple_light() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world, [&](int y, const std::vector<color>& row) {
+    cam.render(world, lights, [&](int y, const std::vector<color>& row) {
         visualizer.on_scanline(y, row);
     });
     visualizer.display();
@@ -310,6 +327,9 @@ void cornell_smoke() {
     world.add(make_shared<constant_medium>(box1, 0.01, color(0,0,0)));
     world.add(make_shared<constant_medium>(box2, 0.01, color(1,1,1)));
 
+    auto empty_material = shared_ptr<material>();
+    quad lights(point3(113,554,127), vec3(330,0,0), vec3(0,0,305), empty_material);
+
     camera cam;
     Visualizer visualizer(600, 1.0);
 
@@ -326,7 +346,7 @@ void cornell_smoke() {
 
     cam.defocus_angle = 0;
 
-    cam.render(world, [&](int y, const std::vector<color>& row) {
+    cam.render(world, lights, [&](int y, const std::vector<color>& row) {
         visualizer.on_scanline(y, row);
     });
     visualizer.display();
@@ -357,6 +377,9 @@ void final_scene(int image_width, int samples_per_pixel, int max_depth) {
 
     auto light = make_shared<diffuse_light>(color(7, 7, 7));
     world.add(make_shared<quad>(point3(123,554,147), vec3(300,0,0), vec3(0,0,265), light));
+
+    auto empty_material = shared_ptr<material>();
+    quad lights(point3(123,554,147), vec3(300,0,0), vec3(0,0,265), empty_material);
 
     auto center1 = point3(400, 400, 200);
     auto center2 = center1 + vec3(30,0,0);
@@ -409,7 +432,7 @@ void final_scene(int image_width, int samples_per_pixel, int max_depth) {
 
     cam.defocus_angle = 0;
 
-    cam.render(world, [&](int y, const std::vector<color>& row) {
+    cam.render(world, lights, [&](int y, const std::vector<color>& row) {
         visualizer.on_scanline(y, row);
     });
     visualizer.display();

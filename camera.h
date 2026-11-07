@@ -3,6 +3,7 @@
 
 #include "hittable.h"
 #include "material.h"
+#include "pdf.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -32,7 +33,7 @@ class camera {
         int thread_count = 0;
         color tile_outline = color(0.35, 0.35, 0.35);
 
-        void render(const hittable& world, ScanlineCallback on_scanline) {
+        void render(const hittable& world, const hittable& lights, ScanlineCallback on_scanline) {
             using namespace std::chrono_literals;
             initialize();
 
@@ -71,8 +72,8 @@ class camera {
                             color pixel_color(0, 0, 0);
                             for (int s_j = 0; s_j < sqrt_spp; s_j++) {
                                 for (int s_i = 0; s_i < sqrt_spp; s_i++) {
-                                    ray r = get_ray(i, j, s_i, s_j);
-                                    pixel_color += ray_color(r, max_depth, world);
+                                    ray r = get_ray(t.x0 + i, t.y0 + j, s_i, s_j);
+                                    pixel_color += ray_color(r, max_depth, world, lights);
                                 }
                             }
                             frame[static_cast<size_t>(t.y0 + j) * image_width + t.x0 + i] = pixel_samples_scale * pixel_color;
@@ -219,7 +220,7 @@ class camera {
             return center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
         }
 
-        color ray_color(const ray& r, int depth, const hittable& world) const {
+        color ray_color(const ray& r, int depth, const hittable& world, const hittable& lights) const {
             if (depth <= 0)
                 return color(0, 0, 0);
 
@@ -228,15 +229,30 @@ class camera {
             if (!world.hit(r, interval(0.001, infinity), rec))
                 return background;
 
-            ray scattered;
-            color attenuation;
-            color color_from_emission = rec.mat->emitted(rec.u, rec.v, rec.p);
+            scatter_record srec;
+            color color_from_emission = rec.mat->emitted(r, rec, rec.u, rec.v, rec.p);
 
-            if (!rec.mat->scatter(r, rec, attenuation, scattered))
+            if (!rec.mat->scatter(r, rec, srec))
                 return color_from_emission;
 
-            color color_from_scatter = attenuation * ray_color(scattered, depth-1, world);
+            if (srec.skip_pdf) {
+                return srec.attenuation * ray_color(srec.skip_pdf_ray, depth-1, world, lights);
+            }
 
+            auto p0 = make_shared<hittable_pdf>(lights, rec.p);
+            auto p1 = make_shared<cosine_pdf>(rec.normal);
+            mixture_pdf mixed_pdf(p0, p1);
+
+            auto light_ptr = make_shared<hittable_pdf>(lights, rec.p);
+            mixture_pdf p(light_ptr, srec.pdf_ptr);
+
+            ray scattered = ray(rec.p, p.generate(), r.time());
+            auto pdf_value = p.value(scattered.direction());
+
+            double scattering_pdf = rec.mat->scattering_pdf(r, rec, scattered);
+
+            color sample_color = ray_color(scattered, depth-1, world, lights);
+            color color_from_scatter = (srec.attenuation * scattering_pdf * sample_color) / pdf_value;
             return color_from_emission + color_from_scatter;
         }
 };

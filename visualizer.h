@@ -381,6 +381,7 @@ public:
     }
 
     void display() {
+        texture.update(image);
         window.setFramerateLimit(60);
         while (window.isOpen()) {
             handle_events();
