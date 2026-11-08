@@ -4,10 +4,13 @@
 #include "hittable.h"
 #include "material.h"
 #include "pdf.h"
+#include "render_progress.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <numeric>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -32,6 +35,7 @@ class camera {
         int tile_size = 32;
         int thread_count = 0;
         color tile_outline = color(0.35, 0.35, 0.35);
+        int max_pass_samples = 64;
 
         void render(const hittable& world, const hittable& lights, ScanlineCallback on_scanline) {
             using namespace std::chrono_literals;
@@ -54,102 +58,153 @@ class camera {
             };
             std::sort(tiles.begin(), tiles.end(), [&](const rect& a, const rect& b) { return dist2(a) < dist2(b); });
 
+            const int n_strata = sqrt_spp * sqrt_spp;
+            std::vector<int> strata_order(n_strata);
+            std::iota(strata_order.begin(), strata_order.end(), 0);
+            std::shuffle(strata_order.begin(), strata_order.end(), std::mt19937(12345));
+
+            std::vector<int> pass_end;
+            for (int done = 0, chunk = 1; done < n_strata; chunk = std::min(chunk * 2, max_pass_samples)) {
+                done = std::min(done + chunk, n_strata);
+                pass_end.push_back(done);
+            }
+            const int n_passes = static_cast<int>(pass_end.size());
+
             const int n_tiles = static_cast<int>(tiles.size());
             const unsigned n_threads = thread_count > 0 ? static_cast<unsigned>(thread_count) : std::max(1u, std::thread::hardware_concurrency() - 1);
-            std::clog << "Threads: " << n_threads << ", tiles: " << n_tiles << " (" << tile_size << "x" << tile_size << ")\n";
+            std::clog << "Threads: " << n_threads << ", tiles: " << n_tiles << " (" << tile_size << "x" << tile_size << ")"
+                      << ", passes: " << n_passes << "\n";
 
-            std::vector<color> frame(static_cast<size_t>(image_width) * image_height);
-            std::vector<std::atomic<int>> rows_done(n_tiles);
-            std::vector<std::atomic<bool>> started(n_tiles);
-            std::atomic<int> next_tile{0};
-            std::atomic<int> tiles_finished{0};
-
-            auto worker = [&] {
-                for (int k; (k = next_tile++) < n_tiles; ) {
-                    const rect& t = tiles[k];
-                    started[k].store(true, std::memory_order_release);
-
-                    for (int j = 0; j < t.h; j++) {
-                        for (int i = 0; i < t.w; i++) {
-                            color pixel_color(0, 0, 0);
-                            for (int s_j = 0; s_j < sqrt_spp; s_j++) {
-                                for (int s_i = 0; s_i < sqrt_spp; s_i++) {
-                                    ray r = get_ray(t.x0 + i, t.y0 + j, s_i, s_j);
-                                    pixel_color += ray_color(r, max_depth, world, lights);
-                                }
-                            }
-                            frame[static_cast<size_t>(t.y0 + j) * image_width + t.x0 + i] = pixel_samples_scale * pixel_color;
-                        }
-                        rows_done[k].store(j + 1, std::memory_order_release);
-                    }
-                    tiles_finished.fetch_add(1, std::memory_order_release);
-                }
-            };
-
-            std::vector<std::thread> threads;
-            for (unsigned n = 0; n < n_threads; n++)
-                threads.emplace_back(worker);
-
+            const size_t n_pixels = static_cast<size_t>(image_width) * image_height;
+            std::vector<color> accum(n_pixels, color(0, 0, 0));
+            std::vector<color> frame(n_pixels, color(0, 0, 0));
             std::vector<std::vector<color>> shown(image_height, std::vector<color>(image_width, color(0, 0, 0)));
-            std::vector<int>  rows_shown(n_tiles, 0);
-            std::vector<char> outlined(n_tiles, 0);
             std::vector<char> dirty(image_height, 0);
             auto last_update = std::chrono::steady_clock::now();
 
-            while (true) {
-                const int finished = tiles_finished.load(std::memory_order_acquire);
+            render_progress = RenderProgress{};
+            render_progress.n_passes = n_passes;
+            render_progress.spp_total = n_strata;
+            render_progress.n_tiles = n_tiles;
+            render_progress.threads = static_cast<int>(n_threads);
+            render_progress.running = true;
+            render_progress.start = std::chrono::steady_clock::now();
 
-                for (int k = 0; k < n_tiles; k++) {
-                    const rect& t = tiles[k];
-                    if (!outlined[k] && started[k].load(std::memory_order_acquire)) {
-                        outlined[k] = 1;
-                        for (int j = rows_shown[k]; j < t.h; j++) {
-                            auto& row = shown[t.y0 + j];
-                            if (j == 0 || j == t.h - 1)
-                                std::fill_n(row.begin() + t.x0, t.w, tile_outline);
-                            row[t.x0] = row[t.x0 + t.w - 1] = tile_outline;
+            for (int pass = 0; pass < n_passes; pass++) {
+                const int s_begin = pass == 0 ? 0 : pass_end[pass - 1];
+                const int s_end = pass_end[pass];
+                const double scale = 1.0 / s_end;
+                const bool first_pass = pass == 0;
+
+                std::vector<std::atomic<int>> rows_done(n_tiles);
+                std::vector<std::atomic<bool>> started(n_tiles);
+                std::atomic<int> next_tile{0};
+                std::atomic<int> tiles_finished{0};
+
+                auto worker = [&] {
+                    for (int k; (k = next_tile++) < n_tiles; ) {
+                        const rect& t = tiles[k];
+                        started[k].store(true, std::memory_order_release);
+
+                        for (int j = 0; j < t.h; j++) {
+                            for (int i = 0; i < t.w; i++) {
+                                color pixel_color(0, 0, 0);
+                                for (int s = s_begin; s < s_end; s++) {
+                                    const int stratum = strata_order[s];
+                                    ray r = get_ray(t.x0 + i, t.y0 + j, stratum % sqrt_spp, stratum / sqrt_spp);
+                                    pixel_color += ray_color(r, max_depth, world, lights);
+                                }
+                                const size_t idx = static_cast<size_t>(t.y0 + j) * image_width + t.x0 + i;
+                                accum[idx] += pixel_color;
+                                frame[idx] = scale * accum[idx];
+                            }
+                            rows_done[k].store(j + 1, std::memory_order_release);
+                        }
+                        tiles_finished.fetch_add(1, std::memory_order_release);
+                    }
+                };
+
+                std::vector<std::thread> threads;
+                for (unsigned n = 0; n < n_threads; n++)
+                    threads.emplace_back(worker);
+
+                std::vector<int>  rows_shown(n_tiles, 0);
+                std::vector<char> outlined(n_tiles, 0);
+
+                while (true) {
+                    const int finished = tiles_finished.load(std::memory_order_acquire);
+                    size_t pixels_done = 0;
+
+                    for (int k = 0; k < n_tiles; k++) {
+                        const rect& t = tiles[k];
+                        if (first_pass && !outlined[k] && started[k].load(std::memory_order_acquire)) {
+                            outlined[k] = 1;
+                            for (int j = rows_shown[k]; j < t.h; j++) {
+                                auto& row = shown[t.y0 + j];
+                                if (j == 0 || j == t.h - 1)
+                                    std::fill_n(row.begin() + t.x0, t.w, tile_outline);
+                                row[t.x0] = row[t.x0 + t.w - 1] = tile_outline;
+                                dirty[t.y0 + j] = 1;
+                            }
+                        }
+
+                        const int done = rows_done[k].load(std::memory_order_acquire);
+                        for (int j = rows_shown[k]; j < done; j++) {
+                            const auto* src = &frame[static_cast<size_t>(t.y0 + j) * image_width + t.x0];
+                            std::copy_n(src, t.w, shown[t.y0 + j].begin() + t.x0);
                             dirty[t.y0 + j] = 1;
                         }
+                        rows_shown[k] = done;
+                        pixels_done += static_cast<size_t>(done) * t.w;
                     }
 
-                    const int done = rows_done[k].load(std::memory_order_acquire);
-                    for (int j = rows_shown[k]; j < done; j++) {
-                        const auto* src = &frame[static_cast<size_t>(t.y0 + j) * image_width + t.x0];
-                        std::copy_n(src, t.w, shown[t.y0 + j].begin() + t.x0);
-                        dirty[t.y0 + j] = 1;
+                    const double pass_fraction = double(pixels_done) / double(n_pixels);
+                    render_progress.pass = pass + 1;
+                    render_progress.spp = s_end;
+                    render_progress.spp_done = s_begin;
+                    render_progress.tiles_done = finished;
+                    render_progress.pass_fraction = pass_fraction;
+                    render_progress.total_fraction = (s_begin + (s_end - s_begin) * pass_fraction) / n_strata;
+
+                    bool sent = false;
+                    for (int y = 0; y < image_height; y++) {
+                        if (!dirty[y]) continue;
+                        on_scanline(y, shown[y]);
+                        dirty[y] = 0;
+                        sent = true;
                     }
-                    rows_shown[k] = done;
+
+                    const auto now = std::chrono::steady_clock::now();
+                    if (sent) {
+                        last_update = now;
+                    } else if (now - last_update > 100ms) {
+                        on_scanline(0, shown[0]);
+                        last_update = now;
+                    }
+
+                    std::clog << "\rPass " << pass + 1 << " / " << n_passes << " (" << s_end << " spp)"
+                              << ", tiles: " << finished << " / " << n_tiles << "   " << std::flush;
+
+                    if (finished == n_tiles) break;
+                    std::this_thread::sleep_for(30ms);
                 }
 
-                bool sent = false;
-                for (int y = 0; y < image_height; y++) {
-                    if (!dirty[y]) continue;
-                    on_scanline(y, shown[y]);
-                    dirty[y] = 0;
-                    sent = true;
-                }
-
-                const auto now = std::chrono::steady_clock::now();
-                if (sent) {
-                    last_update = now;
-                } else if (now - last_update > 100ms) {
-                    on_scanline(0, shown[0]);
-                    last_update = now;
-                }
-
-                std::clog << "\rTiles: " << finished << " / " << n_tiles << "   " << std::flush;
-
-                if (finished == n_tiles) break;
-                std::this_thread::sleep_for(30ms);
+                for (auto& th : threads) th.join();
             }
 
-            for (auto& th : threads) th.join();
+            render_progress.spp_done = n_strata;
+            render_progress.pass_fraction = render_progress.total_fraction = 1.0;
+            render_progress.tiles_done = n_tiles;
+            render_progress.running = false;
+            render_progress.finished = true;
+            render_progress.end = std::chrono::steady_clock::now();
+            on_scanline(0, shown[0]);
+
             std::clog << "\rDone. \n";
         }
 
     private:
         int image_height;
-        double pixel_samples_scale;
         int sqrt_spp;
         double recip_sqrt_spp;
         point3 center;
@@ -166,7 +221,6 @@ class camera {
             image_height = (image_height < 1) ? 1 : image_height;
 
             sqrt_spp = int(std::sqrt(samples_per_pixel));
-            pixel_samples_scale = 1.0 / (sqrt_spp * sqrt_spp);
             recip_sqrt_spp = 1.0 / sqrt_spp;
 
             center = lookfrom;

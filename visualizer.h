@@ -29,6 +29,7 @@
 #endif
 
 #include "color.h"
+#include "render_progress.h"
 
 namespace fs = std::filesystem;
 
@@ -84,6 +85,7 @@ struct ExportOptions {
 class Visualizer {
 private:
     static constexpr unsigned menu_height = 20;
+    static constexpr unsigned status_height = 24;
 
     unsigned width;
     unsigned height;
@@ -306,6 +308,66 @@ private:
         }
 
         draw_export_popup();
+        draw_status_bar();
+    }
+
+    static std::string format_time(double seconds) {
+        const int s = static_cast<int>(seconds + 0.5);
+        char buf[32];
+        if (s >= 3600) std::snprintf(buf, sizeof(buf), "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60);
+        else           std::snprintf(buf, sizeof(buf), "%02d:%02d", s / 60, s % 60);
+        return buf;
+    }
+
+    void draw_status_bar() {
+        const auto win = window.getSize();
+        ImGui::SetNextWindowPos({0.f, float(win.y) - float(status_height)});
+        ImGui::SetNextWindowSize({float(win.x), float(status_height)});
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {8.f, 4.f});
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {4.f, 1.f});
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::GetStyleColorVec4(ImGuiCol_MenuBarBg));
+
+        constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                           ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNav;
+        if (ImGui::Begin("##status_bar", nullptr, flags)) {
+            const RenderProgress& p = render_progress;
+            const double elapsed = p.elapsed_seconds();
+
+            if (!p.running && !p.finished) {
+                ImGui::TextDisabled("Idle");
+            } else if (p.finished) {
+                ImGui::Text("Done  |  %d passes  |  %d spp  |  %d threads  |  %s",
+                            p.n_passes, p.spp_total, p.threads, format_time(elapsed).c_str());
+            } else {
+                ImGui::Text("Pass %d/%d", p.pass, p.n_passes);
+                ImGui::SameLine(); ImGui::TextDisabled("|");
+                ImGui::SameLine(); ImGui::Text("%d/%d spp", p.spp, p.spp_total);
+                ImGui::SameLine(); ImGui::TextDisabled("|");
+                ImGui::SameLine(); ImGui::Text("Tiles %d/%d", p.tiles_done, p.n_tiles);
+                ImGui::SameLine(); ImGui::TextDisabled("|");
+
+                char overlay[32];
+                ImGui::SameLine(); ImGui::TextUnformatted("Pass");
+                std::snprintf(overlay, sizeof(overlay), "%.0f%%", p.pass_fraction * 100.0);
+                ImGui::SameLine(); ImGui::ProgressBar(float(p.pass_fraction), {90.f, 0.f}, overlay);
+
+                ImGui::SameLine(); ImGui::TextUnformatted("Total");
+                std::snprintf(overlay, sizeof(overlay), "%.1f%%", p.total_fraction * 100.0);
+                ImGui::SameLine(); ImGui::ProgressBar(float(p.total_fraction), {90.f, 0.f}, overlay);
+
+                ImGui::SameLine(); ImGui::TextDisabled("|");
+                std::string eta = "--:--";
+                if (p.total_fraction > 0.01)
+                    eta = format_time(elapsed / p.total_fraction - elapsed);
+                ImGui::SameLine(); ImGui::Text("%s  (ETA %s)", format_time(elapsed).c_str(), eta.c_str());
+            }
+        }
+        ImGui::End();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(4);
     }
 
     void render_frame() {
@@ -323,7 +385,7 @@ private:
         const float win_h = float(window_size.y);
         const float menu  = float(menu_height);
 
-        const float area_h = std::max(1.f, win_h - menu);
+        const float area_h = std::max(1.f, win_h - menu - float(status_height));
 
         const float image_ratio = float(width) / float(height);
         const float area_ratio  = win_w / area_h;
@@ -346,7 +408,7 @@ public:
     Visualizer(unsigned image_width, double aspect_ratio)
         : width(image_width),
           height(std::max(1u, static_cast<unsigned>(image_width / aspect_ratio))),
-          window(sf::VideoMode({width, height + menu_height}), "Ray Tracer"),
+          window(sf::VideoMode({width, height + menu_height + status_height}), "Ray Tracer"),
           image({width, height}, sf::Color::Black),
           texture(sf::Vector2u{width, height}),
           sprite(texture)
