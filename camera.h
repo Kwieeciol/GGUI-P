@@ -37,6 +37,8 @@ class camera {
             using namespace std::chrono_literals;
             initialize();
 
+            has_lights = lights.bounding_box().x.size() >= 0;
+
             struct rect { int x0, y0, w, h; };
             std::vector<rect> tiles;
             for (int y = 0; y < image_height; y += tile_size)
@@ -157,6 +159,7 @@ class camera {
         vec3 u, v, w;
         vec3 defocus_disk_u;
         vec3 defocus_disk_v;
+        bool has_lights;
 
         void initialize() {
             image_height = int(image_width / aspect_ratio);
@@ -239,15 +242,12 @@ class camera {
                 return srec.attenuation * ray_color(srec.skip_pdf_ray, depth-1, world, lights);
             }
 
-            auto p0 = make_shared<hittable_pdf>(lights, rec.p);
-            auto p1 = make_shared<cosine_pdf>(rec.normal);
-            mixture_pdf mixed_pdf(p0, p1);
+            shared_ptr<pdf> sampling_pdf = srec.pdf_ptr;
+            if (has_lights)
+                sampling_pdf = make_shared<mixture_pdf>(make_shared<hittable_pdf>(lights, rec.p), srec.pdf_ptr);
 
-            auto light_ptr = make_shared<hittable_pdf>(lights, rec.p);
-            mixture_pdf p(light_ptr, srec.pdf_ptr);
-
-            ray scattered = ray(rec.p, p.generate(), r.time());
-            auto pdf_value = p.value(scattered.direction());
+            ray scattered = ray(rec.p, sampling_pdf->generate(), r.time());
+            auto pdf_value = sampling_pdf->value(scattered.direction());
 
             double scattering_pdf = rec.mat->scattering_pdf(r, rec, scattered);
 

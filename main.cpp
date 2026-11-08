@@ -61,10 +61,10 @@ void bounding_spheres() {
     hittable_list lights; // no light sources in this scene
 
     camera cam;
-    Visualizer visualizer(400, 16.0 / 9.0);
+    Visualizer visualizer(1920, 16.0 / 9.0);
 
     cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 400;
+    cam.image_width = 1920;
     cam.samples_per_pixel = 100;
     cam.max_depth = 50;
     cam.background = color(0.7, 0.8, 1.0);
@@ -94,10 +94,10 @@ void checkered_spheres() {
     hittable_list lights; // no light sources in this scene
 
     camera cam;
-    Visualizer visualizer(400, 16.0 / 9.0);
+    Visualizer visualizer(1920, 16.0 / 9.0);
 
     cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 400;
+    cam.image_width = 1920;
     cam.samples_per_pixel = 100;
     cam.max_depth = 50;
     cam.background = color(0.7, 0.8, 1.0);
@@ -123,10 +123,10 @@ void earth() {
     hittable_list lights; // no light sources in this scene
 
     camera cam;
-    Visualizer visualizer(400, 16.0 / 9.0);
+    Visualizer visualizer(1920, 16.0 / 9.0);
 
     cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 400;
+    cam.image_width = 1920;
     cam.samples_per_pixel = 100;
     cam.max_depth = 50;
     cam.background = color(0.7, 0.8, 1.0);
@@ -154,10 +154,10 @@ void perlin_spheres() {
     hittable_list lights; // no light sources in this scene
 
     camera cam;
-    Visualizer visualizer(400, 16.0 / 9.0);
+    Visualizer visualizer(1920, 16.0 / 9.0);
 
     cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 400;
+    cam.image_width = 1920;
     cam.samples_per_pixel = 100;
     cam.max_depth = 50;
     cam.background = color(0.7, 0.8, 1.0);
@@ -193,10 +193,10 @@ void quads() {
     hittable_list lights; // no light sources in this scene
 
     camera cam;
-    Visualizer visualizer(400, 1.0);
+    Visualizer visualizer(1920, 1.0);
 
     cam.aspect_ratio = 1.0;
-    cam.image_width = 400;
+    cam.image_width = 1920;
     cam.samples_per_pixel = 100;
     cam.max_depth = 50;
     cam.background = color(0.7, 0.8, 1.0);
@@ -244,10 +244,10 @@ void cornell_box() {
     world.add(make_shared<sphere>(point3(190,90,190), 90, glass));
 
     camera cam;
-    Visualizer visualizer(600, 1.0);
+    Visualizer visualizer(1080, 1.0);
 
     cam.aspect_ratio = 1.0;
-    cam.image_width = 600;
+    cam.image_width = 1080;
     cam.samples_per_pixel = 100;
     cam.max_depth = 50;
     cam.background = color(0,0,0);
@@ -280,10 +280,10 @@ void simple_light() {
     quad lights(point3(3,1,-2), vec3(2,0,0), vec3(0,2,0), empty_material);
 
     camera cam;
-    Visualizer visualizer(400, 16.0 / 9.0);
+    Visualizer visualizer(1920, 16.0 / 9.0);
 
     cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 400;
+    cam.image_width = 1920;
     cam.samples_per_pixel = 100;
     cam.max_depth = 50;
     cam.background = color(0,0,0);
@@ -331,10 +331,10 @@ void cornell_smoke() {
     quad lights(point3(113,554,127), vec3(330,0,0), vec3(0,0,305), empty_material);
 
     camera cam;
-    Visualizer visualizer(600, 1.0);
+    Visualizer visualizer(1080, 1.0);
 
     cam.aspect_ratio = 1.0;
-    cam.image_width = 600;
+    cam.image_width = 1080;
     cam.samples_per_pixel = 200;
     cam.max_depth = 50;
     cam.background = color(0,0,0);
@@ -455,8 +455,8 @@ int main(int argc, char* argv[]) {
         case 6: simple_light(); break;
         case 7: cornell_box(); break;
         case 8: cornell_smoke(); break;
-        case 9: final_scene(800, 10000, 40); break;
-        default: final_scene(400, 250, 4); break;
+        case 9: final_scene(1000, 10000, 40); break;
+        default: final_scene(1000, 250, 4); break;
     }
 
     auto t_end = std::chrono::high_resolution_clock::now();
