@@ -94,7 +94,6 @@ class camera {
                 const int s_begin = pass == 0 ? 0 : pass_end[pass - 1];
                 const int s_end = pass_end[pass];
                 const double scale = 1.0 / s_end;
-                const bool first_pass = pass == 0;
 
                 std::vector<std::atomic<int>> rows_done(n_tiles);
                 std::vector<std::atomic<bool>> started(n_tiles);
@@ -137,7 +136,7 @@ class camera {
 
                     for (int k = 0; k < n_tiles; k++) {
                         const rect& t = tiles[k];
-                        if (first_pass && !outlined[k] && started[k].load(std::memory_order_acquire)) {
+                        if (!outlined[k] && started[k].load(std::memory_order_acquire)) {
                             outlined[k] = 1;
                             for (int j = rows_shown[k]; j < t.h; j++) {
                                 auto& row = shown[t.y0 + j];
