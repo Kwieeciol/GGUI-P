@@ -11,6 +11,7 @@
 #include "quad.h"
 #include "visualizer.h"
 #include "constant_medium.h"
+#include "triangle.h"
 
 void bounding_spheres() {
     hittable_list world;
@@ -438,6 +439,104 @@ void final_scene(int image_width, int samples_per_pixel, int max_depth) {
     visualizer.display();
 }
 
+void add_face(hittable_list& list, point3 a, point3 b, point3 c, const point3& inside, shared_ptr<material> mat) {
+    if (dot(cross(b - a, c - a), a - inside) < 0)
+        std::swap(b, c);
+    list.add(make_shared<triangle>(a, b, c, mat));
+}
+
+hittable_list pyramid(const point3& base_center, double half, double height, shared_ptr<material> mat) {
+    hittable_list tris;
+    point3 p0 = base_center + vec3(-half, 0, -half);
+    point3 p1 = base_center + vec3( half, 0, -half);
+    point3 p2 = base_center + vec3( half, 0,  half);
+    point3 p3 = base_center + vec3(-half, 0,  half);
+    point3 apex = base_center + vec3(0, height, 0);
+    point3 inside = base_center + vec3(0, height / 4, 0);
+
+    add_face(tris, p0, p1, apex, inside, mat);
+    add_face(tris, p1, p2, apex, inside, mat);
+    add_face(tris, p2, p3, apex, inside, mat);
+    add_face(tris, p3, p0, apex, inside, mat);
+    add_face(tris, p0, p1, p2, inside, mat);
+    add_face(tris, p0, p2, p3, inside, mat);
+    return tris;
+}
+
+hittable_list tetrahedron(const point3& base_center, double r, shared_ptr<material> mat) {
+    hittable_list tris;
+    point3 v[3];
+    for (int i = 0; i < 3; i++) {
+        double phi = degrees_to_radians(90 + 120 * i);
+        v[i] = base_center + vec3(r * std::cos(phi), 0, r * std::sin(phi));
+    }
+    point3 apex = base_center + vec3(0, r * std::sqrt(2.0), 0);
+    point3 inside = base_center + vec3(0, r * std::sqrt(2.0) / 4, 0);
+
+    add_face(tris, v[0], v[1], v[2], inside, mat);
+    add_face(tris, v[0], v[1], apex, inside, mat);
+    add_face(tris, v[1], v[2], apex, inside, mat);
+    add_face(tris, v[2], v[0], apex, inside, mat);
+    return tris;
+}
+
+hittable_list octahedron(const point3& center, double r, shared_ptr<material> mat) {
+    hittable_list tris;
+    for (int sx : {-1, 1})
+        for (int sy : {-1, 1})
+            for (int sz : {-1, 1})
+                add_face(tris,
+                         center + vec3(sx * r, 0, 0),
+                         center + vec3(0, sy * r, 0),
+                         center + vec3(0, 0, sz * r),
+                         center, mat);
+    return tris;
+}
+
+void triangles() {
+    hittable_list world;
+
+    auto ground = make_shared<lambertian>(make_shared<checker_texture>(0.5, color(.2, .2, .22), color(.8, .8, .8)));
+    auto clay = make_shared<lambertian>(color(0.85, 0.45, 0.2));
+    auto glass = make_shared<dielectric>(1.5);
+    auto steel = make_shared<metal>(color(0.8, 0.85, 0.9), 0.05);
+    auto light = make_shared<diffuse_light>(color(12, 12, 12));
+
+    world.add(make_shared<triangle>(point3(-20, 0, -20), point3(20, 0, -20), point3(20, 0, 20), ground));
+    world.add(make_shared<triangle>(point3(-20, 0, -20), point3(20, 0, 20), point3(-20, 0, 20), ground));
+
+    world.add(make_shared<bvh_node>(pyramid(point3(-2.4, 0, 0), 0.9, 1.7, clay)));
+    world.add(make_shared<bvh_node>(tetrahedron(point3(0, 0, 0.5), 1.0, glass)));
+    world.add(make_shared<bvh_node>(octahedron(point3(2.4, 1.0, 0), 1.0, steel)));
+
+    point3 la(-1.5, 5, -1), lb(1.5, 5, -1), lc(0, 5, 1.5);
+    world.add(make_shared<triangle>(la, lb, lc, light));
+
+    hittable_list lights;
+    lights.add(make_shared<triangle>(la, lb, lc, shared_ptr<material>()));
+
+    camera cam;
+    Visualizer visualizer(1280, 16.0 / 9.0);
+
+    cam.aspect_ratio = 16.0 / 9.0;
+    cam.image_width = 1280;
+    cam.samples_per_pixel = 200;
+    cam.max_depth = 50;
+    cam.background = color(0.2, 0.25, 0.35);
+
+    cam.vfov = 32;
+    cam.lookfrom = point3(0, 3, 9);
+    cam.lookat = point3(0, 0.9, 0);
+    cam.vup = vec3(0, 1, 0);
+
+    cam.defocus_angle = 0;
+
+    cam.render(world, lights, [&](int y, const std::vector<color>& row) {
+        visualizer.on_scanline(y, row);
+    });
+    visualizer.display();
+}
+
 int main(int argc, char* argv[]) {
     int scene = 0;
     if (argc > 1) {
@@ -456,6 +555,7 @@ int main(int argc, char* argv[]) {
         case 7: cornell_box(); break;
         case 8: cornell_smoke(); break;
         case 9: final_scene(1000, 10000, 40); break;
+        case 10: triangles(); break;
         default: final_scene(1000, 250, 4); break;
     }
 
